@@ -25,18 +25,23 @@ def error(msg):
 def workingdir():
 	return os.path.expanduser(WORKINGDIR)
 
+def dbdir():
+	return os.path.join(workingdir(), 'db')
+
+def entryfile(entry):
+	return os.path.join(dbdir(), entry)
+
 def encrypt(entry, passphrase, value):
 	if not value.endswith("\n"):
 		value += "\n"
 	crypt = gpg.encrypt(value.encode('UTF-8'), None, passphrase=passphrase, symmetric=CIPHER, armor=False)
 	if not crypt.ok:
 		raise CryptoError("Encryption failed!")
-	entrypath = os.path.join(workingdir(), 'db', entry)
-	open(entrypath, 'wb').write(crypt.data)
-	os.chmod(entrypath, 0o600)
+	open(entryfile(entry), 'wb').write(crypt.data)
+	os.chmod(entryfile(entry), 0o600)
 
 def decrypt(entry, passphrase):
-	ct = open(os.path.join(workingdir(), 'db', entry), 'rb').read()
+	ct = open(entryfile(entry), 'rb').read()
 	crypt = gpg.decrypt(ct, passphrase=passphrase)
 	if not crypt.ok:
 		raise CryptoError("Decryption failed!")
@@ -59,16 +64,14 @@ def getpass_repeat(purpose):
 	return pass0
 
 def request_current_passphrase(check=True):
-	dbname = os.path.join(workingdir(), 'db')
-	passphrase = getpass("Passphrase for '%s': " % dbname)
+	passphrase = getpass("Passphrase for '%s': " % dbdir())
 	if check:
 		if not check_passphrase(passphrase):
 			error('Invalid passphrase!')
 	return passphrase
 
 def request_new_passphrase():
-	dbname = os.path.expanduser(os.path.join(workingdir(), 'db'))
-	passphrase = getpass_repeat("new passphrase for '%s'" % dbname)
+	passphrase = getpass_repeat("new passphrase for '%s'" % dbdir())
 	return passphrase
 
 def editor(initial_text=""):
@@ -130,25 +133,25 @@ def tree(directory, padding=''):
 
 
 def cmd_init():
-	os.makedirs(os.path.join(workingdir(), 'db'), mode=0o700, exist_ok=True)
+	if os.path.isfile(entryfile("../dbinfo.gpg")):
+		error("Database is already initialized!\nTo change the password use the 'passwd' command.")
+	os.makedirs(dbdir(), mode=0o700, exist_ok=True)
 	passphrase = request_new_passphrase()
 	encrypt("../dbinfo.gpg", passphrase, 'v1')
 
 def cmd_set(entry, ask_overwrite=True, multiline=False):
 	assert not ".." in entry
 
-	entrypath = os.path.join(workingdir(), 'db', entry)
-	entrydir = os.path.split(entrypath)[0]
-	os.makedirs(entrydir, mode=0o700, exist_ok=True)
+	os.makedirs(os.path.dirname(entryfile(entry)), mode=0o700, exist_ok=True)
 
-	if os.path.isfile(entrypath):
+	if os.path.isfile(entryfile(entry)):
 		if ask_overwrite:
 			if not query_yes_no("An entry already exists for %s. Overwrite it?" % entry, default='no'):
 				sys.exit()
 
 	passphrase = request_current_passphrase()
 
-	if os.path.isfile(entrypath):
+	if os.path.isfile(entryfile(entry)):
 		value = decrypt(entry, passphrase)
 	else:
 		value = ""
@@ -234,6 +237,8 @@ if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description="A password manager.")
 	subparsers = parser.add_subparsers(dest='command', metavar='')
 
+	subparsers.add_parser('init', help='Initialize database')
+
 	parser_ls = subparsers.add_parser('ls', help='Show list of passwords')
 	parser_ls.add_argument('path', nargs='?', default='', help='Entry name')
 	parser_ls.add_argument('-t', dest='tree', action='store_true', help='Show tree')
@@ -248,17 +253,22 @@ if __name__ == "__main__":
 	parser_show = subparsers.add_parser('show', help='Show password')
 	parser_show.add_argument('entry', help='Entry name')
 
-	parser_passwd = subparsers.add_parser('passwd', help='Change database password')
+	subparsers.add_parser('passwd', help='Change database password')
 
 	args = parser.parse_args()
 
-	if args.command == 'ls':
-		cmd_ls(path=args.path, show_tree=args.tree)
-	elif args.command == 'show':
-		cmd_show(args.entry)
-	elif args.command == 'add':
-		cmd_set(args.entry, ask_overwrite=True, multiline=args.multiline)
-	elif args.command == 'edit':
-		cmd_set(args.entry, ask_overwrite=False, multiline=True)
-	elif args.command == 'passwd':
-		cmd_passwd()
+	if args.command == 'init':
+		cmd_init()
+	else:
+		if not os.path.isfile(entryfile("../dbinfo.gpg")):
+			error("Database is not initialized!\nTo initialize the database use the 'init' command.")
+		if args.command == 'ls':
+			cmd_ls(path=args.path, show_tree=args.tree)
+		elif args.command == 'show':
+			cmd_show(args.entry)
+		elif args.command == 'add':
+			cmd_set(args.entry, ask_overwrite=True, multiline=args.multiline)
+		elif args.command == 'edit':
+			cmd_set(args.entry, ask_overwrite=False, multiline=True)
+		elif args.command == 'passwd':
+			cmd_passwd()
