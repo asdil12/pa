@@ -31,6 +31,9 @@ def dbdir():
 def entryfile(entry):
 	return os.path.join(dbdir(), entry)
 
+def db_initialized():
+	return os.path.isfile(entryfile("../dbinfo.gpg"))
+
 def encrypt(entry, passphrase, value):
 	if not value.endswith("\n"):
 		value += "\n"
@@ -133,7 +136,7 @@ def tree(directory, padding=''):
 
 
 def cmd_init():
-	if os.path.isfile(entryfile("../dbinfo.gpg")):
+	if db_initialized():
 		error("Database is already initialized!\nTo change the password use the 'passwd' command.")
 	os.makedirs(dbdir(), mode=0o700, exist_ok=True)
 	passphrase = request_new_passphrase()
@@ -260,7 +263,7 @@ if __name__ == "__main__":
 	if args.command == 'init':
 		cmd_init()
 	else:
-		if not os.path.isfile(entryfile("../dbinfo.gpg")):
+		if not db_initialized():
 			error("Database is not initialized!\nTo initialize the database use the 'init' command.")
 		if args.command == 'ls':
 			cmd_ls(path=args.path, show_tree=args.tree)
