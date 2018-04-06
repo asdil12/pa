@@ -7,12 +7,19 @@ import tempfile
 import subprocess
 import gnupg
 import argparse
+import string
+import secrets
 
 gpg = gnupg.GPG()
 
-
+# config
 CIPHER = "AES256"
+DEFAULT_PWLEN = 13
+CLIP_ON_GEN = True
+
+
 WORKINGDIR = "~/.pa"
+PWGEN_SYMBOLS = ".,;:-_#+*~?\\=<>[]{}()/&%$!|^"
 EDITOR = os.environ.get('EDITOR', 'vim')
 
 class CryptoError(Exception):
@@ -134,6 +141,28 @@ def tree(directory, padding=''):
 			else:
 				print(padding + '├── ' + f)
 
+def pwgen(length=DEFAULT_PWLEN, letters=True, digits=True, symbols=False):
+	if length < sum(map(int, [letters, digits, symbols])):
+		error("Password length %i is too short to contain at least one digit of each desired group." % length)
+	alphabet = ""
+	if letters:
+		alphabet += string.ascii_letters
+	if digits:
+		alphabet += string.digits
+	if symbols:
+		alphabet += PWGEN_SYMBOLS
+	while True:
+		password = ''.join(secrets.choice(alphabet) for i in range(length))
+		if letters and not set(password).intersection(string.ascii_letters):
+			continue
+		if digits and not set(password).intersection(string.digits):
+			continue
+		if symbols and not set(password).intersection(PWGEN_SYMBOLS):
+			continue
+		break
+	return password
+
+
 
 def cmd_init():
 	if db_initialized():
@@ -142,7 +171,7 @@ def cmd_init():
 	passphrase = request_new_passphrase()
 	encrypt("../dbinfo.gpg", passphrase, 'v1')
 
-def cmd_set(entry, ask_overwrite=True, multiline=False):
+def cmd_set(entry, ask_overwrite=True, multiline=False, value=None):
 	assert not ".." in entry
 
 	os.makedirs(os.path.dirname(entryfile(entry)), mode=0o700, exist_ok=True)
@@ -154,18 +183,26 @@ def cmd_set(entry, ask_overwrite=True, multiline=False):
 
 	passphrase = request_current_passphrase()
 
-	if os.path.isfile(entryfile(entry)):
-		value = decrypt(entry, passphrase)
-	else:
-		value = ""
+	if not value:
+		if os.path.isfile(entryfile(entry)):
+			value = decrypt(entry, passphrase)
+		else:
+			value = ""
 
-	if multiline:
-		value = editor(value)
-		if not value:
-			error("Nothing changed!")
-	else:
-		value = getpass_repeat("password for %s" % entry)
+		if multiline:
+			value = editor(value)
+			if not value:
+				error("Nothing changed!")
+		else:
+			value = getpass_repeat("password for %s" % entry)
 	encrypt(entry, passphrase, value)
+
+def cmd_gen(length, symbols=False):
+	value = pwgen(length=args.length, symbols=symbols)
+	cmd_set(args.entry, ask_overwrite=True, value=value)
+	print("Generated password: %s" % value)
+	# if CLIP_ON_GEN:
+	#FIXME: add to clipboard and print notice
 
 def cmd_show(entry):
 	assert not ".." in entry
@@ -256,6 +293,11 @@ if __name__ == "__main__":
 	parser_show = subparsers.add_parser('show', help='Show password')
 	parser_show.add_argument('entry', help='Entry name')
 
+	parser_gen = subparsers.add_parser('gen', help='Generate password')
+	parser_gen.add_argument('entry', help='Entry name')
+	parser_gen.add_argument('-l', dest='length', type=int, default=DEFAULT_PWLEN, help='Password length (default: %i)' % DEFAULT_PWLEN)
+	parser_gen.add_argument('-s', dest='symbols', action='store_true', help='Generate password with symbols')
+
 	subparsers.add_parser('passwd', help='Change database password')
 
 	args = parser.parse_args()
@@ -273,5 +315,7 @@ if __name__ == "__main__":
 			cmd_set(args.entry, ask_overwrite=True, multiline=args.multiline)
 		elif args.command == 'edit':
 			cmd_set(args.entry, ask_overwrite=False, multiline=True)
+		elif args.command == 'gen':
+			cmd_gen(length=args.length, symbols=args.symbols)
 		elif args.command == 'passwd':
 			cmd_passwd()
