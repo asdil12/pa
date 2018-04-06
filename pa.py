@@ -9,6 +9,7 @@ import gnupg
 import argparse
 import string
 import secrets
+import time
 
 gpg = gnupg.GPG()
 
@@ -16,6 +17,7 @@ gpg = gnupg.GPG()
 CIPHER = "AES256"
 DEFAULT_PWLEN = 13
 CLIP_ON_GEN = True
+CLIP_TIMEOUT = 30
 
 
 WORKINGDIR = "~/.pa"
@@ -162,6 +164,32 @@ def pwgen(length=DEFAULT_PWLEN, letters=True, digits=True, symbols=False):
 		break
 	return password
 
+def clip(value, primary=True, clipboard=True, timeout=None):
+	def xclip_write(value, board):
+		p = subprocess.Popen(['xclip', '-selection', board], stdin=subprocess.PIPE)
+		p.communicate(input=value.encode('UTF-8'))
+		p.wait()
+
+	def xclip_read(board):
+		return subprocess.check_output(['xclip', '-selection', board, '-o']).decode('UTF-8')
+
+	if primary:
+		xclip_write(value, 'primary')
+
+	if clipboard:
+		xclip_write(value, 'clipboard')
+
+	if timeout:
+		pid = os.fork()
+		if pid == 0:
+			time.sleep(timeout)
+			if primary and xclip_read('primary') == value:
+				xclip_write("", 'primary')
+
+			if clipboard and xclip_read('clipboard') == value:
+				xclip_write("", 'clipboard')
+
+			sys.exit()
 
 
 def cmd_init():
@@ -201,18 +229,17 @@ def cmd_gen(length, symbols=False):
 	value = pwgen(length=args.length, symbols=symbols)
 	cmd_set(args.entry, ask_overwrite=True, value=value)
 	print("Generated password: %s" % value)
-	# if CLIP_ON_GEN:
-	#FIXME: add to clipboard and print notice
+	if CLIP_ON_GEN:
+		clip(value, timeout=CLIP_TIMEOUT)
+		print("Password added to clipboard for %i seconds" % CLIP_TIMEOUT)
 
 def cmd_show(entry):
 	assert not ".." in entry
 
-	entrypath = os.path.join(workingdir(), 'db', entry)
-
 	# fallback to ls for incomplete path
-	if os.path.isdir(entrypath):
+	if os.path.isdir(entryfile(entry)):
 		cmd_ls(entry)
-	elif not os.path.isfile(entrypath):
+	elif not os.path.isfile(entryfile(entry)):
 		error("Entry %s not found!" % entry)
 
 	passphrase = request_current_passphrase()
@@ -220,6 +247,22 @@ def cmd_show(entry):
 	value = decrypt(entry, passphrase)
 
 	print(value.rstrip("\n"))
+
+def cmd_clip(entry):
+	assert not ".." in entry
+
+	# fallback to ls for incomplete path
+	if os.path.isdir(entryfile(entry)):
+		cmd_ls(entry)
+	elif not os.path.isfile(entryfile(entry)):
+		error("Entry %s not found!" % entry)
+
+	passphrase = request_current_passphrase()
+
+	value = decrypt(entry, passphrase)
+
+	clip(value, timeout=CLIP_TIMEOUT)
+	print("Password added to clipboard for %i seconds" % CLIP_TIMEOUT)
 
 def cmd_ls(path="", show_tree=False):
 	dbdir = os.path.join(workingdir(), "db")
@@ -293,12 +336,16 @@ if __name__ == "__main__":
 	parser_show = subparsers.add_parser('show', help='Show password')
 	parser_show.add_argument('entry', help='Entry name')
 
+	parser_clip = subparsers.add_parser('clip', help='Add password to clipboard')
+	parser_clip.add_argument('entry', help='Entry name')
+
 	parser_gen = subparsers.add_parser('gen', help='Generate password')
 	parser_gen.add_argument('entry', help='Entry name')
 	parser_gen.add_argument('-l', dest='length', type=int, default=DEFAULT_PWLEN, help='Password length (default: %i)' % DEFAULT_PWLEN)
 	parser_gen.add_argument('-s', dest='symbols', action='store_true', help='Generate password with symbols')
 
 	subparsers.add_parser('passwd', help='Change database password')
+
 
 	args = parser.parse_args()
 
@@ -311,6 +358,8 @@ if __name__ == "__main__":
 			cmd_ls(path=args.path, show_tree=args.tree)
 		elif args.command == 'show':
 			cmd_show(args.entry)
+		elif args.command == 'clip':
+			cmd_clip(args.entry)
 		elif args.command == 'add':
 			cmd_set(args.entry, ask_overwrite=True, multiline=args.multiline)
 		elif args.command == 'edit':
