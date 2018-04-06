@@ -320,18 +320,9 @@ if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description="A password manager.")
 	subparsers = parser.add_subparsers(dest='command', metavar='')
 
-	subparsers.add_parser('init', help='Initialize database')
-
 	parser_ls = subparsers.add_parser('ls', help='Show list of passwords')
 	parser_ls.add_argument('path', nargs='?', default='', help='Entry name')
 	parser_ls.add_argument('-t', dest='tree', action='store_true', help='Show tree')
-
-	parser_add = subparsers.add_parser('add', help='Add password')
-	parser_add.add_argument('entry', help='Entry name')
-	parser_add.add_argument('-m', dest='multiline', action='store_true', help='Add multiline password')
-
-	parser_add = subparsers.add_parser('edit', help='Edit password')
-	parser_add.add_argument('entry', help='Entry name')
 
 	parser_show = subparsers.add_parser('show', help='Show password')
 	parser_show.add_argument('entry', help='Entry name')
@@ -343,6 +334,15 @@ if __name__ == "__main__":
 	parser_gen.add_argument('entry', help='Entry name')
 	parser_gen.add_argument('-l', dest='length', type=int, default=DEFAULT_PWLEN, help='Password length (default: %i)' % DEFAULT_PWLEN)
 	parser_gen.add_argument('-s', dest='symbols', action='store_true', help='Generate password with symbols')
+
+	parser_add = subparsers.add_parser('add', help='Add password')
+	parser_add.add_argument('entry', help='Entry name')
+	parser_add.add_argument('-m', dest='multiline', action='store_true', help='Add multiline password')
+
+	parser_add = subparsers.add_parser('edit', help='Edit password')
+	parser_add.add_argument('entry', help='Entry name')
+
+	subparsers.add_parser('init', help='Initialize database')
 
 	subparsers.add_parser('passwd', help='Change database password')
 
