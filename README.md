@@ -4,3 +4,4 @@
 
 - python-gnupg
 - xclip
+- gpg
