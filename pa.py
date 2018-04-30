@@ -317,56 +317,59 @@ def cmd_passwd():
 
 
 if __name__ == "__main__":
-	parser = argparse.ArgumentParser(description="A password manager.")
-	subparsers = parser.add_subparsers(dest='command', metavar='')
+	try:
+		parser = argparse.ArgumentParser(description="A password manager.")
+		subparsers = parser.add_subparsers(dest='command', metavar='')
 
-	parser_ls = subparsers.add_parser('ls', help='Show list of passwords')
-	parser_ls.add_argument('path', nargs='?', default='', help='Entry name')
-	parser_ls.add_argument('-t', dest='tree', action='store_true', help='Show tree')
+		parser_ls = subparsers.add_parser('ls', help='Show list of passwords')
+		parser_ls.add_argument('path', nargs='?', default='', help='Entry name')
+		parser_ls.add_argument('-t', dest='tree', action='store_true', help='Show tree')
 
-	parser_show = subparsers.add_parser('show', help='Show password')
-	parser_show.add_argument('entry', help='Entry name')
+		parser_show = subparsers.add_parser('show', help='Show password')
+		parser_show.add_argument('entry', help='Entry name')
 
-	parser_clip = subparsers.add_parser('clip', help='Add password to clipboard')
-	parser_clip.add_argument('entry', help='Entry name')
+		parser_clip = subparsers.add_parser('clip', help='Add password to clipboard')
+		parser_clip.add_argument('entry', help='Entry name')
 
-	parser_gen = subparsers.add_parser('gen', help='Generate password')
-	parser_gen.add_argument('entry', help='Entry name')
-	parser_gen.add_argument('-l', dest='length', type=int, default=DEFAULT_PWLEN, help='Password length (default: %i)' % DEFAULT_PWLEN)
-	parser_gen.add_argument('-s', dest='symbols', action='store_true', help='Generate password with symbols')
+		parser_gen = subparsers.add_parser('gen', help='Generate password')
+		parser_gen.add_argument('entry', help='Entry name')
+		parser_gen.add_argument('-l', dest='length', type=int, default=DEFAULT_PWLEN, help='Password length (default: %i)' % DEFAULT_PWLEN)
+		parser_gen.add_argument('-s', dest='symbols', action='store_true', help='Generate password with symbols')
 
-	parser_add = subparsers.add_parser('add', help='Add password')
-	parser_add.add_argument('entry', help='Entry name')
-	parser_add.add_argument('-m', dest='multiline', action='store_true', help='Add multiline password')
+		parser_add = subparsers.add_parser('add', help='Add password')
+		parser_add.add_argument('entry', help='Entry name')
+		parser_add.add_argument('-m', dest='multiline', action='store_true', help='Add multiline password')
 
-	parser_add = subparsers.add_parser('edit', help='Edit password')
-	parser_add.add_argument('entry', help='Entry name')
+		parser_add = subparsers.add_parser('edit', help='Edit password')
+		parser_add.add_argument('entry', help='Entry name')
 
-	subparsers.add_parser('init', help='Initialize database')
+		subparsers.add_parser('init', help='Initialize database')
 
-	subparsers.add_parser('passwd', help='Change database password')
+		subparsers.add_parser('passwd', help='Change database password')
 
 
-	args = parser.parse_args()
+		args = parser.parse_args()
 
-	if args.command == 'init':
-		cmd_init()
-	else:
-		if not db_initialized():
-			error("Database is not initialized!\nTo initialize the database use the 'init' command.")
-		if args.command == 'ls':
-			cmd_ls(path=args.path, show_tree=args.tree)
-		elif args.command == 'show':
-			cmd_show(args.entry)
-		elif args.command == 'clip':
-			cmd_clip(args.entry)
-		elif args.command == 'add':
-			cmd_set(args.entry, ask_overwrite=True, multiline=args.multiline)
-		elif args.command == 'edit':
-			cmd_set(args.entry, ask_overwrite=False, multiline=True)
-		elif args.command == 'gen':
-			cmd_gen(length=args.length, symbols=args.symbols)
-		elif args.command == 'passwd':
-			cmd_passwd()
+		if args.command == 'init':
+			cmd_init()
 		else:
-			cmd_ls(show_tree=True)
+			if not db_initialized():
+				error("Database is not initialized!\nTo initialize the database use the 'init' command.")
+			if args.command == 'ls':
+				cmd_ls(path=args.path, show_tree=args.tree)
+			elif args.command == 'show':
+				cmd_show(args.entry)
+			elif args.command == 'clip':
+				cmd_clip(args.entry)
+			elif args.command == 'add':
+				cmd_set(args.entry, ask_overwrite=True, multiline=args.multiline)
+			elif args.command == 'edit':
+				cmd_set(args.entry, ask_overwrite=False, multiline=True)
+			elif args.command == 'gen':
+				cmd_gen(length=args.length, symbols=args.symbols)
+			elif args.command == 'passwd':
+				cmd_passwd()
+			else:
+				cmd_ls(show_tree=True)
+	except KeyboardInterrupt:
+		print("^C")
