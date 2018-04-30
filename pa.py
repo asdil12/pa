@@ -368,3 +368,5 @@ if __name__ == "__main__":
 			cmd_gen(length=args.length, symbols=args.symbols)
 		elif args.command == 'passwd':
 			cmd_passwd()
+		else:
+			cmd_ls(show_tree=True)
